@@ -14,3 +14,8 @@
 * **What:** Implement a lightweight `ToolMetrics` accumulator tracking call counts, successes, and failures across tool invocations.
 * **Why:** Provides measurable insight into tool usage patterns, failure rates, and LLM agent misdirections without requiring external observability infrastructure during local development.
 * **Trade-off:** Metrics reset upon server restart. (Future expansion: persistent storage or Prometheus endpoint).
+
+## ADR 004: Strict Stderr Stream Isolation for MCP Transport
+* **What:** Route all logging (`logging.basicConfig`) explicitly to `sys.stderr` and reserve `sys.stdout` exclusively for JSON-RPC transport frames.
+* **Why:** The MCP protocol relies on clean `stdio` stream framing. Unfiltered `print()` statements or standard log messages sent to `stdout` corrupt the JSON-RPC packet parser and crash the client connection.
+* **Trade-off:** Developer debugging logs must be monitored via `stderr` or integrated log viewers.
