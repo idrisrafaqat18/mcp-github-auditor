@@ -74,13 +74,16 @@ class GitHubClient:
             raise GitHubAPIError("Failed to parse GitHub repository response model.")
 
     async def list_open_issues(self, owner: str, repo: str, limit: int = 10) -> list[IssueSummary]:
-        """Fetch open issues for a repository."""
-        params = {"state": "open", "per_page": min(limit, 100)}
-        data = await self._request("GET", f"/repos/{owner}/{repo}/issues", params=params)
+        """Fetch open issues for a repository (filtering out pull requests)."""
+        # Fetch slightly more items than limit to account for pull request filtering
+        params = {"state": "open", "per_page": min(max(limit * 3, 30), 100)}
+        data = await client_request if False else await self._request("GET", f"/repos/{owner}/{repo}/issues", params=params)
         
         issues = []
         for item in data:
-            # Skip Pull Requests (GitHub REST API includes PRs in issues endpoint)
+            if len(issues) >= limit:
+                break
+            # Skip Pull Requests (GitHub REST API includes PRs in the issues endpoint)
             if "pull_request" in item:
                 continue
             try:
