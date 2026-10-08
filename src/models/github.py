@@ -1,47 +1,56 @@
-from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, Field, HttpUrl
+import os
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class GitHubUser(BaseModel):
-    login: str
-    id: int
-    avatar_url: HttpUrl
-    html_url: HttpUrl
+# This file stores the app's configuration in one place.
+# In simple terms: it reads values like the GitHub token and log level from
+# environment variables (such as a local .env file) so the program can run
+# without putting secret values directly in the source code.
+class Settings(BaseSettings):
+    """Configuration settings for the MCP GitHub Auditor server."""
+
+    # The token lets this app talk to GitHub on your behalf.
+    # It is read from the environment variable GITHUB_PERSONAL_ACCESS_TOKEN.
+    github_personal_access_token: str = Field(
+        default="",
+        alias="GITHUB_PERSONAL_ACCESS_TOKEN",
+        description="GitHub Personal Access Token (PAT) with read permissions."
+    )
+
+    # Controls how noisy the logs are: INFO, DEBUG, WARNING, etc.
+    log_level: str = Field(
+        default="INFO",
+        alias="LOG_LEVEL",
+        description="Application logging level."
+    )
+
+    # Tell pydantic-settings to look for values in a .env file.
+    # This is helpful during local development because the app can read secrets
+    # without being hardcoded in the code.
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+    @property
+    def headers(self) -> dict[str, str]:
+        """Generate default headers for GitHub API requests."""
+        # These headers tell GitHub what kind of data we want and which API version
+        # we are using. They also include a custom user-agent name for identification.
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "MCP-GitHub-Auditor/0.1.0",
+        }
+
+        # If a token exists, attach it to the request so GitHub knows who is asking.
+        # This is the equivalent of presenting an ID card when visiting a secure area.
+        if self.github_personal_access_token:
+            headers["Authorization"] = f"Bearer {self.github_personal_access_token}"
+        return headers
 
 
-class RepositoryOverview(BaseModel):
-    id: int
-    name: str
-    full_name: str
-    private: bool
-    owner: GitHubUser
-    description: Optional[str] = None
-    html_url: HttpUrl
-    stargazers_count: int = Field(default=0)
-    forks_count: int = Field(default=0)
-    open_issues_count: int = Field(default=0)
-    language: Optional[str] = None
-    default_branch: str = "main"
-    created_at: datetime
-    updated_at: datetime
-
-
-class IssueSummary(BaseModel):
-    number: int
-    title: str
-    state: str
-    user: GitHubUser
-    comments: int
-    created_at: datetime
-    updated_at: datetime
-    html_url: HttpUrl
-    body: Optional[str] = None
-    labels: list[str] = Field(default_factory=list)
-
-
-class RateLimitStatus(BaseModel):
-    limit: int
-    remaining: int
-    reset_timestamp: int
-    used: int
+# Create one shared settings object that the rest of the app can use.
+settings = Settings()
